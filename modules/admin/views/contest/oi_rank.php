@@ -6,14 +6,13 @@ use yii\helpers\Html;
 
 $this->title = $model->title;
 $problems = $model->problems;
-$rank_result = $model->getRankData(false);
+$rank_result = $model->getOIRankData(false);
 $first_blood = $rank_result['first_blood'];
 $result = $rank_result['rank_result'];
 $submit_count = $rank_result['submit_count'];
 
 $this->registerAssetBundle('yii\bootstrap\BootstrapPluginAsset');
 ?>
-
 <div class="wrap">
     <div class="container">
         <div class="row">
@@ -35,7 +34,8 @@ $this->registerAssetBundle('yii\bootstrap\BootstrapPluginAsset');
                 <th width="60px">Rank</th>
                 <th width="120px">Username</th>
                 <th width="120px">Nickname</th>
-                <th title="# solved / penalty time" colspan="2">Score</th>
+                <th width="80px">测评总分</th>
+                <th width="80px">订正总分</th>
                 <?php foreach($problems as $key => $p): ?>
                     <th>
                         <?= chr(65 + $key) ?>
@@ -81,42 +81,20 @@ $this->registerAssetBundle('yii\bootstrap\BootstrapPluginAsset');
                         <?= Html::encode($rank['nickname']); ?>
                     </th>
                     <th class="score-solved">
-                        <?= $rank['solved'] ?>
+                        <?= $rank['total_score'] ?>
                     </th>
                     <th class="score-time">
-                        <?= intval($rank['time'] / 60) ?>
+                        <?= $rank['correction_score'] ?>
                     </th>
                     <?php
                     foreach($problems as $key => $p) {
-                        $css_class = "";
-                        $num = 0;
-                        $time = "";
-                        if (isset($rank['ac_time'][$p['problem_id']]) && $rank['ac_time'][$p['problem_id']] > 0) {
-                            if ($first_blood[$p['problem_id']] == $rank['user_id']) {
-                                $css_class = 'solved-first';
-                            } else {
-                                $css_class = 'solved';
-                            }
-                            $num = $rank['ce_count'][$p['problem_id']] + $rank['wa_count'][$p['problem_id']] + 1;
-                            $time = intval($rank['ac_time'][$p['problem_id']]);
-                        } else if (isset($rank['pending'][$p['problem_id']]) && $rank['pending'][$p['problem_id']]) {
-                            $css_class = 'pending';
-                            $num = $rank['ce_count'][$p['problem_id']] + $rank['wa_count'][$p['problem_id']] + $rank['pending'][$p['problem_id']];
-                            $time = '';
-                        } else if (isset($rank['wa_count'][$p['problem_id']])) {
-                            $css_class = 'attempted';
-                            $num = $rank['ce_count'][$p['problem_id']] + $rank['wa_count'][$p['problem_id']];
-                            $time = '';
+                        $score = "";
+                        $max_score = "";
+                        if (isset($rank['score'][$p['problem_id']])) {
+                            $score = $rank['score'][$p['problem_id']];
+                            $max_score = $rank['max_score'][$p['problem_id']];
                         }
-                        if ($num == 0) {
-                            $num = '';
-                            $span = '';
-                        } else if ($num == 1) {
-                            $span = 'try';
-                        } else {
-                            $span = 'tries';
-                        }
-                        echo "<th class=\"table-problem-cell {$css_class}\">{$time}<br><small>{$num} {$span}</small></th>";
+                        echo "<th class=\"table-problem-cell\">{$score}<br><small>{$max_score}</small></th>";
                     }
                     ?>
                 </tr>

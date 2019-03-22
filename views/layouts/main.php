@@ -48,7 +48,7 @@ AppAsset::register($this);
     </header>
     <?php
     NavBar::begin([
-        'brandLabel' => Yii::$app->params['ojName'] . ' OJ',
+        'brandLabel' => Yii::$app->setting->get('ojName') . ' OJ',
         'brandUrl' => Yii::$app->homeUrl,
         'options' => [
             'class' => 'navbar-default',
@@ -58,11 +58,15 @@ AppAsset::register($this);
         ['label' => '<span class="glyphicon glyphicon-home"></span> ' . Yii::t('app', 'Home'), 'url' => ['/site/index']],
         ['label' => '<span class="glyphicon glyphicon-list"></span> ' . Yii::t('app', 'Problems'), 'url' => ['/problem/index']],
         ['label' => '<span class="glyphicon glyphicon-signal"></span> ' . Yii::t('app', 'Status'), 'url' => ['/solution/index']],
-        ['label' => '<span class="glyphicon glyphicon-king"></span> ' . Yii::t('app', 'Rating'), 'url' => ['/rating/index']],
+        [
+            'label' => '<span class="glyphicon glyphicon-king"></span> ' . Yii::t('app', 'Rating'),
+            'url' => ['/rating/problem'],
+            'active' => Yii::$app->controller->id == 'rating'
+        ],
         ['label' => '<span class="glyphicon glyphicon-book"></span> ' . Yii::t('app', 'Homework'), 'url' => ['/homework/index']],
         ['label' => '<span class="glyphicon glyphicon-knight"></span> ' . Yii::t('app', 'Contests'), 'url' => ['/contest/index']],
         [
-            'label' => '<span class="glyphicon glyphicon-info-sign"></span> Wiki',
+            'label' => '<span class="glyphicon glyphicon-info-sign"></span> '. Yii::t('app', 'Wiki'),
             'url' => ['/wiki/index'],
             'active' => Yii::$app->controller->id == 'wiki'
         ],
@@ -108,7 +112,7 @@ AppAsset::register($this);
 
 <footer class="footer">
     <div class="container">
-        <p class="pull-left">&copy; <?= Yii::$app->params['ojName'] ?> OJ <?= date('Y') ?></p>
+        <p class="pull-left">&copy; <?= Yii::$app->setting->get('ojName') ?> OJ <?= date('Y') ?></p>
     </div>
 </footer>
 

@@ -32,8 +32,9 @@
 #include <mysql/mysql.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
-#include <signal.h>
+#include <sys/sysinfo.h>
 #include <sys/resource.h>
+#include <signal.h>
 #include "common.h"
 
 #define LOCKFILE "/var/run/polygon.pid"
@@ -98,7 +99,7 @@ void init_mysql_conf()
     FILE *fp = NULL;
     char buf[BUFFER_SIZE];
     db.port_number = 3306;
-    max_running = 3;
+    max_running = get_nprocs();
     sleep_time = 1;
     oj_tot = 1;
     oj_mod = 0;
@@ -111,7 +112,6 @@ void init_mysql_conf()
             read_buf(buf, "OJ_PASSWORD", db.password);
             read_buf(buf, "OJ_DB_NAME", db.db_name);
             read_int(buf, "OJ_PORT_NUMBER", &db.port_number);
-            read_int(buf, "OJ_RUNNING", &max_running);
             read_int(buf, "OJ_SLEEP_TIME", &sleep_time);
             read_int(buf, "OJ_TOTAL", &oj_tot);
             read_int(buf, "OJ_MOD", &oj_mod);
@@ -205,10 +205,10 @@ int init_mysql()
             sleep(2);
             return 1;
         } else {
-            return 0;
+            return executesql("set names utf8");
         }
     } else {
-        return executesql("set names utf8");
+        return executesql("commit");
     }
 }
 

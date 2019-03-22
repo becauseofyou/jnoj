@@ -25,6 +25,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <getopt.h>
 #include <syslog.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -32,8 +33,9 @@
 #include <mysql/mysql.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
-#include <signal.h>
+#include <sys/sysinfo.h>
 #include <sys/resource.h>
+#include <signal.h>
 #include "common.h"
 
 #define LOCKFILE "/var/run/judged.pid"
@@ -41,7 +43,6 @@
 #define BUFFER_SIZE 1024
 #define STD_MB 1048576
 
-extern int optind, opterr, optopt;
 static char lock_file[BUFFER_SIZE] = LOCKFILE;
 static char oj_home[BUFFER_SIZE];
 static char judge_path[BUFFER_SIZE];
@@ -52,6 +53,8 @@ static int sleep_tmp;
 static int oj_tot;
 static int oj_mod;
 
+
+static int oi_mode = 0;
 static bool STOP = false;
 static MYSQL *conn;
 static MYSQL_RES *res;
@@ -92,7 +95,7 @@ void init_mysql_conf()
     FILE *fp = NULL;
     char buf[BUFFER_SIZE];
     db.port_number = 3306;
-    max_running = 3;
+    max_running = get_nprocs();
     sleep_time = 1;
     oj_tot = 1;
     oj_mod = 0;
@@ -106,7 +109,6 @@ void init_mysql_conf()
             read_buf(buf, "OJ_DB_NAME", db.db_name);
             read_buf(buf, "OJ_MYSQL_UNIX_PORT", db.mysql_unix_port);
             read_int(buf, "OJ_PORT_NUMBER", &db.port_number);
-            read_int(buf, "OJ_RUNNING", &max_running);
             read_int(buf, "OJ_SLEEP_TIME", &sleep_time);
             read_int(buf, "OJ_TOTAL", &oj_tot);
             read_int(buf, "OJ_MOD", &oj_mod);
@@ -127,7 +129,8 @@ void init_mysql_conf()
 
 void run_client(int runid, int clientid)
 {
-    char buf[BUFFER_SIZE], runidstr[BUFFER_SIZE];
+    char clientidstr[BUFFER_SIZE];
+    char runidstr[BUFFER_SIZE];
     struct rlimit LIM;
     LIM.rlim_max = 800;
     LIM.rlim_cur = 800;
@@ -144,21 +147,13 @@ void run_client(int runid, int clientid)
     LIM.rlim_cur = LIM.rlim_max = 200;
     setrlimit(RLIMIT_NPROC, &LIM);
 
-    //buf[0]=clientid+'0'; buf[1]=0;
-    sprintf(runidstr, "%d", runid);
-    sprintf(buf, "%d", clientid);
+    sprintf(runidstr, "-s %d", runid);
+    sprintf(clientidstr, "-r %d", clientid);
 
-    //write_log("sid=%s\tclient=%s\toj_home=%s\n",runidstr,buf,oj_home);
-    //sprintf(err,"%s/run%d/error.out",oj_home,clientid);
-    //freopen(err,"a+",stderr);
-
-    if (!DEBUG) {
-        execl(judge_path, judge_path, runidstr, buf,
-              oj_home, (char *) NULL);
-    } else {
-        execl(judge_path, judge_path, runidstr, buf,
-              oj_home, "debug", (char *) NULL);
-    }
+    execl(judge_path, judge_path, runidstr, clientidstr,
+          oi_mode ? "-o" : "",
+          DEBUG ? "-d" : "",
+          (char *) NULL);
 }
 
 int executesql(const char *sql)
@@ -195,10 +190,10 @@ int init_mysql()
             sleep(2);
             return 1;
         } else {
-            return 0;
+            return executesql("set names utf8");
         }
     } else {
-        return executesql("set names utf8");
+        return executesql("commit");
     }
 }
 
@@ -433,22 +428,46 @@ void set_path()
     judge_path[++cnt] = '\0';
 }
 
-int main(int argc, char *argv[])
+void display_usage()
 {
-    char ch;
-    opterr = 0;
-    while ((ch = getopt(argc, argv, "doh")) != -1) {
+    fprintf(stderr, "Judge server for JNOJ.\n\n");
+    fprintf(stderr, "  Options may be given in one of two forms: either a single\n");
+    fprintf(stderr, "  character preceded by a -, or a name preceded by --.\n");
+    fprintf(stderr, "  -d ...... --debug\n");
+    fprintf(stderr, "              Enable debug mode.\n");
+    fprintf(stderr, "  -o ...... --oi\n");
+    fprintf(stderr, "              Enable oi mode.\n");
+    fprintf(stderr, "  -h ...... --help\n");
+    fprintf(stderr, "              Dsiplay help (from command line).\n");
+}
+
+void init_parameters(int argc, char *argv[])
+{
+    int ch;
+    struct option long_options[] = {
+        {"debug", no_argument, 0,  'd'},
+        {"oi",  no_argument, 0, 'o'},
+        {"help",  no_argument, 0, 'h'}
+    };
+    while ((ch = getopt_long(argc, argv, "doh", long_options, 0)) != -1) {
         switch (ch) {
+            case 'o':
+                oi_mode = 1;
+                printf("Enable OI mode.\n");
+                break;
             case 'd':
                 DEBUG = 1;
+                printf("Enable DEBUG mode.\n");
                 break;
             case 'h':
-                printf("Usage: dispatcher -h -d -o\n");
-                printf("-d : Turn on debug mode\n");
-                printf("-h : Help\n");
-                return 0;
+                display_usage();
+                exit(1);
         }
     }
+}
+int main(int argc, char *argv[])
+{
+    init_parameters(argc, argv);
     set_path();
     chdir(oj_home); // change the dir
 

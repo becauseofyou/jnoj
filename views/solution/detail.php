@@ -20,8 +20,11 @@ $this->params['breadcrumbs'][] = $this->title;
             <th width="200px"><?= Yii::t('app', 'Problem') ?></th>
             <th width="80px"><?= Yii::t('app', 'Lang') ?></th>
             <th><?= Yii::t('app', 'Verdict') ?></th>
-            <th>Time</th>
-            <th>Memory</th>
+            <?php if (Yii::$app->setting->get('oiMode')): ?>
+                <th width="80px"><?= Yii::t('app', 'Score') ?></th>
+            <?php endif; ?>
+            <th><?= Yii::t('app', 'Time') ?></th>
+            <th><?= Yii::t('app', 'Memory') ?></th>
             <th><?= Yii::t('app', 'Code Length') ?></th>
             <th><?= Yii::t('app', 'Submit Time') ?></th>
         </tr>
@@ -32,7 +35,16 @@ $this->params['breadcrumbs'][] = $this->title;
             <th><?= Html::a(Html::encode($model->user->nickname), ['/user/view', 'id' => $model->created_by]) ?></th>
             <th><?= Html::a(Html::encode($model->problem->title), ['/problem/view', 'id' => $model->problem_id]) ?></th>
             <th><?= Solution::getLanguageList($model->language) ?></th>
-            <th><?= Solution::getResultList($model->result) ?></th>
+            <th>
+                <?php if ($model->canViewResult()) {
+                    echo Solution::getResultList($model->result);
+                } else {
+                    echo Solution::getResultList(Solution::OJ_WT0);
+                } ?>
+            </th>
+            <?php if (Yii::$app->setting->get('oiMode')): ?>
+                <th width="80px"><?= $model->score ?></th>
+            <?php endif; ?>
             <th><?= $model->time ?> MS</th>
             <th><?= $model->memory ?> KB</th>
             <th><?= $model->code_length ?></th>
@@ -41,31 +53,76 @@ $this->params['breadcrumbs'][] = $this->title;
         </tbody>
     </table>
 </div>
-<hr>
-
-<h3>Tests(<?= $model->getPassedTestCount() ?>/<?= $model->getTestCount() ?>):</h3>
-
-<h3>
-<?php for ($i = 1; $i <= $model->getPassedTestCount(); $i++): ?>
-    <?php if ($i <= $model->getTestCount()) :?>
-        <span class="glyphicon glyphicon-ok-circle text-success"></span>
-    <?php else: ?>
-        <span class="glyphicon glyphicon-remove-circle text-danger"></span>
-    <?php endif; ?>
-<?php endfor; ?>
-<?php if ($model->getPassedTestCount() < $model->getTestCount()) :?>
-    <span class="glyphicon glyphicon-remove-circle text-danger"></span>
+<?php if (!Yii::$app->setting->get('oiMode')): ?>
+    <hr>
+    <h3>Tests(<?= $model->getPassedTestCount() ?>/<?= $model->getTestCount() ?>):</h3>
+    <h3>
+        <?php for ($i = 1; $i <= $model->getPassedTestCount(); $i++): ?>
+            <?php if ($i <= $model->getTestCount()) : ?>
+                <span class="glyphicon glyphicon-ok-circle text-success"></span>
+            <?php else: ?>
+                <span class="glyphicon glyphicon-remove-circle text-danger"></span>
+            <?php endif; ?>
+        <?php endfor; ?>
+        <?php if ($model->getPassedTestCount() < $model->getTestCount()) : ?>
+            <span class="glyphicon glyphicon-remove-circle text-danger"></span>
+        <?php endif; ?>
+    </h3>
 <?php endif; ?>
-</h3>
 
 <?php if ($model->canViewSource()): ?>
     <hr>
-    <h3>Code:</h3>
     <div class="pre"><p><?= Html::encode($model->source) ?></p></div>
 <?php endif; ?>
 
 <?php if ($model->solutionInfo != null && $model->canViewErrorInfo()): ?>
     <hr>
-    <h3>Run Info:</h3>
-    <pre><?= \yii\helpers\HtmlPurifier::process($model->solutionInfo->error) ?></pre>
+    <h3><?= Yii::t('app', 'Judgement Protocol') ?>:</h3>
+    <div id="run-info">
+
+    </div>
+<?php
+$json = $model->solutionInfo->run_info;
+$json = str_replace(PHP_EOL,"<br>",$json);
+$oiMode = Yii::$app->setting->get('oiMode');
+$verdict = $model->result;
+$CE = Solution::OJ_CE;
+$js = <<<EOF
+
+var oiMode = $oiMode;
+var verdict = $verdict;
+var CE = $CE;
+
+var json = '$json';
+if (verdict != CE) {
+    json = eval('(' + json + ')');
+    var subtasks = json.subtasks;
+    var testId = 1;
+    for (var i = 0; i < subtasks.length; i++) {
+        var cases = subtasks[i].cases;
+        var score = subtasks[i].score;
+        var isSubtask = (subtasks.length != 1);
+        if (isSubtask) {
+            $("#run-info").append(subtaskHtml(i + 1, score));
+            for (var j = 0; j < cases.length; j++) {
+                var id = i + 1;
+                $('#subtask-body-' + id).append(testHtml(testId, cases[j]));
+                testId++;
+            }
+        } else {
+            for (var j = 0; j < cases.length; j++) {
+                $("#run-info").append(testHtml(testId, cases[j]));
+                testId++;
+            }
+        }
+    }
+    json = "";
+}
+if (verdict == CE) {
+    $("#run-info").append(json);
+}
+EOF;
+$this->registerJs($js);
+?>
+
 <?php endif; ?>

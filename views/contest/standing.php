@@ -11,6 +11,7 @@ $this->title = $model->title;
 $this->params['model'] = $model;
 ?>
 <div class="contest-overview text-center center-block">
+    <?php if ($model->type != \app\models\Contest::TYPE_OI): ?>
     <div class="legend-strip">
         <div class="pull-right table-legend">
             <div>
@@ -30,11 +31,16 @@ $this->params['model'] = $model;
             </div>
         </div>
     </div>
+    <?php endif; ?>
     <div class="clearfix"></div>
     <div class="table-responsive">
         <?php
             if ($model->type == $model::TYPE_RANK_SINGLE) {
                 echo $this->render('_standing_single', [
+                    'model' => $model
+                ]);
+            } else if ($model->type == $model::TYPE_OI) {
+                echo $this->render('_standing_oi', [
                     'model' => $model
                 ]);
             } else {
