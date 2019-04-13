@@ -50,9 +50,9 @@ class ContestController extends Controller
         $this->layout = 'main';
         $dataProvider = new ActiveDataProvider([
             'query' => Contest::find()->where([
-                'status' => Contest::STATUS_VISIBLE
+                '<>', 'status', Contest::STATUS_HIDDEN
             ])->andWhere([
-                '<>', 'type', Contest::TYPE_HOMEWORK
+                'group_id' => 0
             ])->orderBy(['id' => SORT_DESC]),
         ]);
 
@@ -157,6 +157,11 @@ class ContestController extends Controller
 
         // 线下赛只能在后台加入，在此处不给注册
         if ($model->scenario == Contest::SCENARIO_OFFLINE) {
+            throw new ForbiddenHttpException('You are not allowed to perform this action.');
+        }
+
+        // 设为私有的比赛只能在后台加入，在此处不给注册
+        if ($model->status == Contest::STATUS_PRIVATE) {
             throw new ForbiddenHttpException('You are not allowed to perform this action.');
         }
 
@@ -282,10 +287,12 @@ class ContestController extends Controller
             }
         }
         if (!Yii::$app->user->isGuest && $newClarify->load(Yii::$app->request->post())) {
-            // 判断是否已经参赛
+            // 判断是否已经参赛，提交即参加比赛
             if (!$model->isUserInContest()) {
-                Yii::$app->session->setFlash('error', 'Submit Failed. You did not register for the contest.');
-                return $this->refresh();
+                Yii::$app->db->createCommand()->insert('{{%contest_user}}', [
+                   'contest_id' => $model->id,
+                   'user_id' => Yii::$app->user->id
+                ])->execute();
             }
             $newClarify->entity = Discuss::ENTITY_CONTEST;
             $newClarify->entity_id = $model->id;
@@ -388,8 +395,13 @@ class ContestController extends Controller
 
         if (!Yii::$app->user->isGuest && $solution->load(Yii::$app->request->post())) {
             if (!$model->isUserInContest()) {
-                Yii::$app->session->setFlash('error', 'Submit Failed. You did not register for the contest.');
-                return $this->refresh();
+                // 判断是否已经参赛，提交即参加比赛
+                if (!$model->isUserInContest()) {
+                    Yii::$app->db->createCommand()->insert('{{%contest_user}}', [
+                        'contest_id' => $model->id,
+                        'user_id' => Yii::$app->user->id
+                    ])->execute();
+                }
             }
             if ($model->getRunStatus() == Contest::STATUS_NOT_START) {
                 Yii::$app->session->setFlash('error', 'The contest has not started.');
@@ -447,7 +459,7 @@ class ContestController extends Controller
     protected function findModel($id)
     {
         if (($model = Contest::findOne($id)) !== null) {
-            if ($model->status == Contest::STATUS_VISIBLE || !Yii::$app->user->isGuest && Yii::$app->user->id === $model->created_by) {
+            if ($model->status != Contest::STATUS_HIDDEN || !Yii::$app->user->isGuest && Yii::$app->user->id === $model->created_by) {
                 return $model;
             } else {
                 throw new ForbiddenHttpException('You are not allowed to perform this action.');

@@ -3,6 +3,7 @@
 namespace app\models;
 
 use Yii;
+use yii\caching\TagDependency;
 use yii\db\Expression;
 use yii\db\Query;
 
@@ -17,6 +18,7 @@ use yii\db\Query;
  * @property string $status
  * @property string $description
  * @property string $editorial
+ * @property int $group_id
  * @property int $type
  * @property int $scenario
  * @property int $created_by
@@ -52,8 +54,9 @@ class Contest extends \yii\db\ActiveRecord
     /**
      * 是否可见
      */
-    const STATUS_HIDDEN = 0;
-    const STATUS_VISIBLE = 1;
+    const STATUS_HIDDEN = 0; // 隐藏
+    const STATUS_VISIBLE = 1; // 公开
+    const STATUS_PRIVATE = 2; // 私有
 
     /**
      * 线上线下场景
@@ -75,9 +78,10 @@ class Contest extends \yii\db\ActiveRecord
     public function rules()
     {
         return [
+            [['title', 'start_time', 'end_time'], 'required'],
             [['start_time', 'end_time', 'lock_board_time'], 'safe'],
             [['description', 'editorial'], 'string'],
-            [['id', 'status', 'type', 'scenario', 'created_by'], 'integer'],
+            [['id', 'status', 'type', 'scenario', 'created_by', 'group_id'], 'integer'],
             [['title'], 'string', 'max' => 255],
         ];
     }
@@ -152,6 +156,11 @@ class Contest extends \yii\db\ActiveRecord
         return $this->hasOne(User::className(), ['id' => 'created_by']);
     }
 
+    public function getGroup()
+    {
+        return $this->hasOne(Group::className(), ['id' => 'group_id']);
+    }
+
     /**
      * 返回比赛的状态，还没开始，正在进行，已经结束
      * @param $description boolean 是否显示文字描述
@@ -204,13 +213,19 @@ class Contest extends \yii\db\ActiveRecord
      */
     public function getProblems()
     {
-        return Yii::$app->db->createCommand('
-            SELECT `p`.`title`, `p`.`id` AS `problem_id`, `c`.`num`
-            FROM `problem` `p`
-            LEFT JOIN `contest_problem` `c` ON `c`.`contest_id`=:cid
-            WHERE p.id=c.problem_id
-            ORDER BY `c`.`num`
-        ', [':cid' => $this->id])->queryAll();
+        $dependency = new \yii\caching\DbDependency([
+            'sql'=>'SELECT COUNT(*) FROM {{%contest_problem}} WHERE contest_id=:cid',
+            'params' => [':cid' => $this->id]
+        ]);
+        return Yii::$app->db->cache(function ($db) {
+            return $db->createCommand('
+                SELECT `p`.`title`, `p`.`id` AS `problem_id`, `c`.`num`
+                FROM `problem` `p`
+                LEFT JOIN `contest_problem` `c` ON `c`.`contest_id`=:cid
+                WHERE p.id=c.problem_id
+                ORDER BY `c`.`num`
+            ', [':cid' => $this->id])->queryAll();
+        }, 60, $dependency);
     }
 
     /**
@@ -519,14 +534,18 @@ class Contest extends \yii\db\ActiveRecord
      */
     public function getProblemById($id)
     {
-        return Yii::$app->db->createCommand(
-            "SELECT `cp`.`num`, `p`.`title`, `p`.`id`, `p`.`description`, 
-            `p`.`input`, `p`.`output`, `p`.`sample_input`, `p`.`sample_output`, `p`.`hint`, `p`.`time_limit`, 
-            `p`.`memory_limit` 
-            FROM `problem` `p` 
-            LEFT JOIN `contest_problem` `cp` ON cp.problem_id=p.id 
-            WHERE (`cp`.`num`={$id}) AND (`cp`.`contest_id`={$this->id})"
-        )->queryOne();
+        $contestID = $this->id;
+        $dependency = new TagDependency(['tags' => ['id' => $id, 'contestID' => $contestID]]);
+        return Yii::$app->db->cache(function ($db) use ($id, $contestID) {
+            return $db->createCommand(
+                "SELECT `cp`.`num`, `p`.`title`, `p`.`id`, `p`.`description`, 
+                `p`.`input`, `p`.`output`, `p`.`sample_input`, `p`.`sample_output`, `p`.`hint`, `p`.`time_limit`, 
+                `p`.`memory_limit` 
+                FROM `problem` `p` 
+                LEFT JOIN `contest_problem` `cp` ON cp.problem_id=p.id 
+                WHERE (`cp`.`num`={$id}) AND (`cp`.`contest_id`={$contestID})"
+            )->queryOne();
+        }, 60, $dependency);
     }
 
     public function getClarifies()
@@ -613,7 +632,7 @@ class Contest extends \yii\db\ActiveRecord
     public function canView()
     {
         // 比赛结束
-        if ($this->getRunStatus() == Contest::STATUS_ENDED) {
+        if ($this->status == Contest::STATUS_VISIBLE && $this->getRunStatus() == Contest::STATUS_ENDED) {
             return true;
         }
         $isAdmin = !Yii::$app->user->isGuest && Yii::$app->user->identity->role == User::ROLE_ADMIN;
@@ -623,12 +642,19 @@ class Contest extends \yii\db\ActiveRecord
             return true;
         }
         // 该比赛/作业不可见
-        if ($this->status != Contest::STATUS_VISIBLE) {
+        if ($this->status == Contest::STATUS_HIDDEN) {
             return false;
         }
         // 参赛用户
         if ($this->isUserInContest()) {
             return true;
+        }
+        // 小组成员
+        if ($this->group_id != 0) {
+            return Yii::$app->db->createCommand('SELECT count(*) FROM {{%group_user}} WHERE user_id=:uid AND group_id=:gid', [
+                ':uid' => Yii::$app->user->id,
+                ':gid' => $this->group_id
+            ])->queryScalar();
         }
         return false;
     }

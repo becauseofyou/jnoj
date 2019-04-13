@@ -63,7 +63,10 @@ AppAsset::register($this);
             'url' => ['/rating/problem'],
             'active' => Yii::$app->controller->id == 'rating'
         ],
-        ['label' => '<span class="glyphicon glyphicon-book"></span> ' . Yii::t('app', 'Homework'), 'url' => ['/homework/index']],
+        [
+            'label' => '<span class="glyphicon glyphicon-user"></span> ' . Yii::t('app', 'Group'),
+            'url' => Yii::$app->user->isGuest ? ['/group/index'] : ['/group/my-group']
+        ],
         ['label' => '<span class="glyphicon glyphicon-knight"></span> ' . Yii::t('app', 'Contests'), 'url' => ['/contest/index']],
         [
             'label' => '<span class="glyphicon glyphicon-info-sign"></span> '. Yii::t('app', 'Wiki'),
@@ -119,34 +122,7 @@ AppAsset::register($this);
 <?php $this->endBody() ?>
 <script type="text/javascript">
     (function ($) {
-        $(document).ready(function () {
-            $(".katex.math.inline").each(function () {
-                var parent = $(this).parent()[0];
-                if (parent.localName !== "code") {
-                    var texTxt = $(this).text();
-                    var el = $(this).get(0);
-                    try {
-                        katex.render(texTxt, el);
-                    } catch (err) {
-                        $(this).html("<span class=\'err\'>" + err);
-                    }
-                } else {
-                    $(this).parent().text($(this).parent().text());
-                }
-            });
-            $(".katex.math.multi-line").each(function () {
-                var texTxt = $(this).text();
-                var el = $(this).get(0);
-                try {
-                    katex.render(texTxt, el, {displayMode: true})
-                } catch (err) {
-                    $(this).html("<span class=\'err\'>" + err)
-                }
-            });
-            $('.pre p').each(function(i, block) {  // use <pre><p>
-                hljs.highlightBlock(block);
-            });
-        })
+
     })(jQuery);
 </script>
 </body>

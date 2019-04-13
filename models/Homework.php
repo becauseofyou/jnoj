@@ -14,6 +14,7 @@ class Homework extends Contest
      */
     const STATUS_DRAFT = 0;
     const STATUS_PUBLISHED = 1;
+    const STATUS_PRIVATE = 2;
 
     /**
      * @inheritdoc
@@ -22,9 +23,11 @@ class Homework extends Contest
     {
         return [
             [['title', 'start_time', 'end_time'], 'required'],
+            [['description', 'editorial'], 'string'],
             [['created_by'], 'integer'],
-            [['start_time', 'end_time'], 'safe'],
+            [['start_time', 'end_time', 'lock_board_time'], 'safe'],
             [['title'], 'string', 'max' => 255],
+            [['id', 'status', 'type', 'scenario', 'created_by', 'group_id'], 'integer'],
         ];
     }
 
@@ -41,24 +44,30 @@ class Homework extends Contest
             'status' => Yii::t('app', 'Status'),
             'type' => Yii::t('app', 'Type'),
             'created_by' => Yii::t('app', 'Created By'),
+            'description' => Yii::t('app', 'Description'),
+            'editorial' => Yii::t('app', 'Editorial'),
         ];
     }
 
     /**
-     * This is invoked before the record is saved.
-     * @return boolean whether the record should be saved.
+     * 判断是否有管理、编辑该作业的权限
      */
-    public function beforeSave($insert)
+    public function hasPermission()
     {
-        if (parent::beforeSave($insert)) {
-            if ($this->isNewRecord) {
-                $this->created_by = Yii::$app->user->id;
-                $this->status = self::STATUS_DRAFT;
-                $this->type = self::TYPE_HOMEWORK;
-            }
-            return true;
-        } else {
+        if (Yii::$app->user->isGuest) {
             return false;
         }
+        // 不是作业
+        if ($this->group_id == 0) {
+            return false;
+        }
+        // 创建人
+        if ($this->created_by == Yii::$app->user->id) {
+            return true;
+        }
+        if ($this->group->hasPermission()) {
+            return true;
+        }
+        return false;
     }
 }

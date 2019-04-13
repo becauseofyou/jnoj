@@ -6,15 +6,16 @@ use yii\widgets\ActiveForm;
 use yii\bootstrap\Modal;
 use yii\bootstrap\Nav;
 use app\models\Contest;
+use app\models\Homework;
 
 /* @var $this yii\web\View */
 /* @var $model app\models\Homework */
 
 $this->title = Html::encode($model->title);
-$this->params['breadcrumbs'][] = ['label' => Yii::t('app', 'Homework'), 'url' => ['index']];
+$this->params['breadcrumbs'][] = ['label' => Yii::t('app', 'Group'), 'url' => ['index']];
+$this->params['breadcrumbs'][] = ['label' => Html::encode($model->group->name), 'url' => ['/group/view', 'id' => $model->group->id]];
 $this->params['breadcrumbs'][] = ['label' => Html::encode($model->title), 'url' => ['view', 'id' => $model->id]];
 $this->params['breadcrumbs'][] = Yii::t('app', 'Setting');
-
 $this->params['model'] = $model;
 $problems = $model->problems;
 ?>
@@ -45,10 +46,13 @@ $problems = $model->problems;
 
             <?= $form->field($model, 'description')->widget('app\widgets\ckeditor\CKeditor'); ?>
 
-            <?= $form->field($model, 'status')->radioList([
-                1 => Yii::t('app', 'Published'),
-                0 => Yii::t('app', 'Draft')
-            ])->hint('设为“草稿”时，该作业对其它用户不可见') ?>
+            <?= $form->field($model, 'editorial')->widget('app\widgets\ckeditor\CKeditor'); ?>
+
+            <?= $form->field($model, 'type')->radioList([
+                Contest::TYPE_RANK_SINGLE => Yii::t('app', 'Single Ranked'),
+                Contest::TYPE_RANK_GROUP => Yii::t('app', 'Group Ranked'),
+                Contest::TYPE_OI => Yii::t('app', 'OI'),
+            ])->hint('不同类型的区别只在于榜单的排名方式。详见：' . Html::a('比赛类型', ['/wiki/contest'], ['target' => '_blank']) . '。如需使用OI比赛，请在后台设置页面启用OI模式。') ?>
 
             <div class="form-group">
                 <?= Html::submitButton(Yii::t('app', 'Save'), ['class' => 'btn btn-success']) ?>

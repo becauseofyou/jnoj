@@ -7,10 +7,16 @@ JNOJ Change Log
 
 请阅读 [update.md](https://github.com/shi-yang/jnoj/blob/master/docs/update.md) 来获取更新方法。
 
-0.9.0 2019.3.18 (under development)
+0.9.0 2019.4.10 (under development)
 ------------------
-**还在测试中，请勿升级 2019.3.18**
 - Enh: [web、judge、db] 支持 OI 判题模式。**不兼容更新，更新后需要到后台设置页面修改oj名称、学校名称**
+- Enh: [web] 私有比赛、作业模式。将比赛设为私有时，任何时候均只能由参赛用户访问。
+- Bug: [web] 删除参赛用户导致无法访问榜单
+- Bug: [web] 部分页面无法显示 katex 公式
+- Enh: [web、db] 新增小组功能，可以创建小组，小组内可以创建比赛。**不兼容更新：移除作业功能，将作业功能放置在小组内创建**
+- Enh: [web] 完善小组管理机制
+- Enh: [web] 小组作业题解编辑
+- Enh: [judge] OI 模式下存在子任务时，若子任务出错则不再测评该子任务
 
 0.8.0 2019.3.3
 ------------------
